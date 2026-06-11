@@ -12,7 +12,7 @@ import Caleñidad from "../assets/songs/CALEÑIDAD Sonora Trucupey Orquesta de C
 import TesoroBenitoCover from "../assets/covers/El Tesoro de Benito.jpg";
 import TesoroBenitoCover2 from "../assets/covers/El Tesoro de Benito 2.jpg";
 
-import VisajeaCover from "../assets/covers/visajea.jpg";
+import VisajeaCover from "../assets/covers/Visajea.jpg";
 import CaleñidadCover from "../assets/covers/Caleñidad.jpg";
 
 
