@@ -10,7 +10,8 @@ const VinylPlayer = ({
   onPrev, 
   hasPrev, 
   hasNext, 
-  progress = 0 
+  progress = 0, 
+  isReady = false
 }) => {
   // 💿 CALIBRACIÓN VISUAL DE LA AGUJA (Ángulos en grados)
   // El pivote está en la esquina superior derecha (top-right)
@@ -150,6 +151,7 @@ const VinylPlayer = ({
         
         <button 
           onClick={onPlayPause}
+          disabled={!isReady}
           className="w-16 h-16 flex items-center justify-center bg-black text-white rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all"
         >
           {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
@@ -158,7 +160,7 @@ const VinylPlayer = ({
         {showNavigation && (
           <button 
             onClick={onNext}
-            disabled={!hasNext}
+            disabled={!hasNext || !isReady}
             className={`p-2 transition-all duration-300 ${!hasNext ? 'opacity-0 pointer-events-none' : 'text-gray-400 hover:text-gray-600 hover:scale-110 active:scale-90'}`}
           >
             <SkipForward size={24} fill="currentColor" />
