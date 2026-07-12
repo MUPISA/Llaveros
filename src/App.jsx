@@ -95,8 +95,8 @@ function App() {
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          console.error("Error al reproducir:", error);
-          setAudioError("No se pudo iniciar la reproducción. Asegúrate de haber interactuado con la página primero.");
+          console.error("Error:", error);
+          setAudioError(lang === "es" ? "No se pudo iniciar la reproducción. Asegúrate de haber interactuado con la página primero." : "Error playing audio, please check your internet connection.");
           setIsPlaying(false);
         });
       }
