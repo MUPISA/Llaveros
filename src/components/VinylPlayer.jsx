@@ -10,18 +10,18 @@ const VinylPlayer = ({
   onPrev, 
   hasPrev, 
   hasNext, 
-  progress = 0 
+  progress = 0,
+  isAudioReady // Propiedad recibida desde App.jsx para el estado del buffer de audio[cite: 4]
 }) => {
-  // 💿 CALIBRACIÓN VISUAL DE LA AGUJA (Ángulos en grados)
-  // El pivote está en la esquina superior derecha (top-right)
   const AJUSTES_AGUJA = {
-    fuera: 15,    // Posición de reposo (Pausado)
-    inicio: 0,    // Posición al empezar la canción (0%)
-    final: -25,   // Posición al terminar la canción (100%)
-    largo: 174    // Largo del brazo en píxeles (w-36 = 144px)
+    fuera: 15,
+    inicio: 0,
+    final: -25,
+    largo: 174
   };
 
   const [rotation, setRotation] = useState(0);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const animationRef = useRef();
 
   useEffect(() => {
@@ -37,24 +37,29 @@ const VinylPlayer = ({
     return () => cancelAnimationFrame(animationRef.current);
   }, [isPlaying]);
 
-  // Cálculo de rotación basado en los ajustes superiores
+  useEffect(() => {
+    setImgLoaded(false);
+    if (!song) return;
+    const img = new Image();
+    img.src = song.cover;
+    img.onload = () => setImgLoaded(true);
+  }, [song]);
+
   const needleRotation = isPlaying 
     ? AJUSTES_AGUJA.inicio + (progress * (AJUSTES_AGUJA.final - AJUSTES_AGUJA.inicio)) 
     : AJUSTES_AGUJA.fuera;
 
   const showNavigation = hasPrev || hasNext;
+  const isFullyReady = isAudioReady && imgLoaded; // Estado combinado de carga[cite: 4]
 
   return (
     <div className="relative flex flex-col items-center justify-center p-10 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-gray-100 max-w-md w-full transition-all duration-500">
-      {/* Vinyl Record Container */}
       <div className="relative w-72 h-72 md:w-80 md:h-80 flex items-center justify-center">
-        {/* The Player Base Shadow */}
         <div className="absolute inset-4 bg-black/5 rounded-full blur-2xl" />
         
-        {/* The Vinyl Container with Transition Animation */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={song?.title} // Triggers animation on song change
+            key={song?.title}
             initial={{ rotate: -180, opacity: 0, scale: 0.8 }}
             animate={{ rotate: rotation, opacity: 1, scale: 1 }}
             exit={{ rotate: 180, opacity: 0, scale: 0.8 }}
@@ -64,41 +69,32 @@ const VinylPlayer = ({
               opacity: { duration: 0.3 }
             }}
             className="relative w-64 h-64 md:w-72 md:h-72 bg-[#121212] rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex items-center justify-center border-[6px] border-[#1a1a1a] z-20"
-        >
-          {/* Groove Texture */}
-          <div className="absolute inset-0 rounded-full" style={{
-            background: 'repeating-radial-gradient(circle, #1a1a1a 0%, #1a1a1a 1%, #222 1.2%, #1a1a1a 1.4%)',
-            opacity: 0.4
-          }} />
-          
-          {/* Center Label (Cover Art) */}
-          <div className="relative w-24 h-24 md:w-28 md:h-28 bg-white rounded-full overflow-hidden border-[5px] border-black/80 z-10 shadow-lg">
-            {song?.cover ? (
-              <img src={song.cover} alt="Cover" className="w-full h-full object-cover" draggable="false" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
-                <Music size={32} />
+          >
+            <div className="absolute inset-0 rounded-full" style={{
+              background: 'repeating-radial-gradient(circle, #1a1a1a 0%, #1a1a1a 1%, #222 1.2%, #1a1a1a 1.4%)',
+              opacity: 0.4
+            }} />
+            
+            <div className="relative w-24 h-24 md:w-28 md:h-28 bg-white rounded-full overflow-hidden border-[5px] border-black/80 z-10 shadow-lg">
+              {song?.cover ? (
+                <img src={song.cover} alt="Cover" className="w-full h-full object-cover" draggable="false" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
+                  <Music size={32} />
+                </div>
+              )}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border border-gray-200 z-20 shadow-inner flex items-center justify-center">
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
               </div>
-            )}
-            {/* Center Hole */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border border-gray-200 z-20 shadow-inner flex items-center justify-center">
-              <div className="w-1 h-1 bg-gray-400 rounded-full" />
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
         </AnimatePresence>
 
-        {/* The Needle Arm */}
         <motion.div
           initial={{ rotate: 180 }}
           animate={{ rotate: needleRotation }}
           transition={{ 
-            rotate: { 
-              type: "spring", 
-              stiffness: isPlaying ? 30 : 40, 
-              damping: 15,
-              mass: 1
-            } 
+            rotate: { type: "spring", stiffness: isPlaying ? 30 : 40, damping: 15, mass: 1 } 
           }}
           className="absolute top-4 right-4 h-6 origin-top-right z-30"
           style={{ 
@@ -107,13 +103,10 @@ const VinylPlayer = ({
           }}
         >
           <div className="relative w-full h-full flex items-center">
-            {/* Arm Body */}
             <div className="w-full h-2 bg-gradient-to-l from-gray-400 to-gray-300 rounded-full shadow-md" />
-            {/* Needle Head */}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-5 bg-gray-700 rounded-sm transform -rotate-6 shadow-lg flex items-center justify-center">
                <div className="w-1 h-3 bg-gray-500 rounded-full" />
             </div>
-            {/* Pivot Point */}
             <div className="absolute right-0 top-0 w-8 h-8 bg-gray-400 rounded-full border-2 border-gray-200 shadow-xl flex items-center justify-center">
                <div className="w-4 h-4 bg-gray-500 rounded-full" />
             </div>
@@ -121,7 +114,6 @@ const VinylPlayer = ({
         </motion.div>
       </div>
 
-      {/* Song Info */}
       <div className="mt-8 text-center h-20 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           <motion.div
@@ -136,7 +128,6 @@ const VinylPlayer = ({
         </AnimatePresence>
       </div>
 
-      {/* Controls */}
       <div className="mt-8 flex items-center gap-8">
         {showNavigation && (
           <button 
@@ -150,9 +141,15 @@ const VinylPlayer = ({
         
         <button 
           onClick={onPlayPause}
-          className="w-16 h-16 flex items-center justify-center bg-black text-white rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all"
+          disabled={!isFullyReady || !song}
+          className={`w-16 h-16 flex items-center justify-center rounded-full shadow-lg transition-all 
+            ${!isFullyReady ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:scale-105 active:scale-95'}`}
         >
-          {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+          {!isFullyReady ? (
+            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />
+          )}
         </button>
 
         {showNavigation && (
