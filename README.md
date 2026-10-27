@@ -6,97 +6,85 @@ Este repositorio contiene la aplicación web del **Museo Pioneros de la Salsa Ca
 
 ## ⚙️ ¿Cómo funciona la aplicación? (Arquitectura Técnica)
 
-1. **Lectura de Código NFC / URL:**
-   - Al acercar el llavero al teléfono, se abre la web con un parámetro en la URL: `https://music.mupisacali.com/?code=CODIGO_AQUI`.
-   - La aplicación detecta el parámetro `code` al cargar (`useEffect` en `App.js`), busca la colección mediante la función `getCollectionByCode(code)` y limpia la URL visual para el usuario.
-   - La colección se guarda en `sessionStorage` bajo la clave `llavero_code`, lo que permite mantener la música cargada aunque el usuario recargue la página.
+1. **Lectura de Parámetros NFC / URL:**
+   - Al acercar el llavero al teléfono, se abre la web soportando dos parámetros opcionales en la cadena de consulta: `?code=CODIGO` y `id=ID_UNICO`.
+   - **Sistema Híbrido (Diccionario + Respaldo):** 
+     - La aplicación primero verifica si existe el parámetro `id` en el archivo de mapeo remoto (`src/data/idMap.json`). Si el ID está registrado allí, utiliza el código de colección asociado.
+     - Si no hay un `id`, o el ID no se encuentra en el diccionario, la aplicación recurre por defecto al parámetro `code` directo de la URL (garantizando compatibilidad con los llaveros antiguos).
+   - La colección se valida mediante `getCollectionByCode(activeCode)` y se almacena en `sessionStorage` (`llavero_code`) para persistir la sesión ante recargas.
 
-2. **Reproductor de Vinilo Interactivo (`VinylPlayer.jsx`):**
+2. **Panel de Biblioteca e Historial (`LibrarySidebar.jsx`):**
+   - Panel lateral deslizante que almacena localmente (`localStorage` bajo la clave `mupisa_library`) cada llavero o colección escaneada exitosamente.
+   - Permite al usuario reanudar colecciones pasadas con un solo toque sin requerir el llavero físico.
+
+3. **Reproductor de Vinilo Interactivo (`VinylPlayer.jsx`):**
    - Simula un tocadiscos real usando **Framer Motion**.
-   - **Disco:** Gira de forma continua mediante `requestAnimationFrame` cuando la canción está reproduciéndose.
-   - **Brazo de Aguja:** La rotación de la aguja (`needleRotation`) se calcula dinámicamente según el porcentaje de progreso (`progress`) de la canción actual, moviéndose desde la posición de inicio (`0°`) hasta el final (`-25°`), y regresando a reposo (`15°`) al pausar.
+   - **Disco:** Gira de forma continua mediante `requestAnimationFrame` al reproducir.
+   - **Brazo de Aguja:** Rota dinámicamente según el progreso de la pista (`progress`).
 
-3. **Gestión de Audio:**
-   - Utiliza la API de audio nativa de JavaScript (`Audio`) integrada con `audioService.js` para gestionar las URLs de streaming.
-   - Permite pausar/reproducir, adelantar o retrasar haciendo clic en la barra de progreso (`handleSeek`), y cambiar entre canciones de la misma colección (`handleNext` / `handlePrev`).
-
-4. **Compatibilidad y Permisos:**
-   - **Móviles / iOS:** Incluye el componente `AudioPermissionModal.jsx` para gestionar el permiso explícito de reproducción de audio en dispositivos Apple (iOS), guardando la autorización en `sessionStorage`.
-   - **i18n (Idiomas):** Detecta automáticamente el idioma del navegador (`navigator.language`) para alternar entre Español e Inglés.
+4. **Gestión de Audio:**
+   - Utiliza la API nativa de JavaScript (`Audio`) integrada con `audioService.js` para streaming y control de reproducción (`play`, `pause`, `seek`, `next`, `prev`).
 
 ---
 
-## 🎵 1. Cómo subir y registrar nuevas canciones
+## 🗂️ Estructura de Datos y Configuración Remota
 
-Para añadir una nueva canción o colección al sistema, debes seguir estos dos pasos:
-
-### Paso 1: Subir los archivos de audio e imágenes
-1. Guarda el archivo audio `.mp3` en la carpeta pública del proyecto:
-   `public/songs/nombre-cancion.mp3`
-2. Si la canción o colección incluye carátula personalizada, guarda la imagen en:
-   `public/covers/nombre-portada.jpg` (o en la carpeta de assets configurada).
-
-### Paso 2: Registrar la colección en la base de datos local
-Abre el archivo de datos de canciones (ubicado en `src/data/songs.js`) y añade una nueva entrada con la siguiente estructura:
-
+### 1. Base de datos estática de canciones: `src/data/songs.js`
+Define las colecciones musicales del museo, asociando un identificador de colección (`code`) con sus metadatos y pistas de audio:
 ```javascript
-// Ejemplo en src/data/songs.js
 export const collections = {
-  "codigo-de-ejemplo": {
-    spotify: "[https://open.spotify.com/album/](https://open.spotify.com/album/)...",      // Opcional
-    youtubeMusic: "[https://music.youtube.com/playlist](https://music.youtube.com/playlist)...", // Opcional
+  "codigo-de-coleccion": {
+    id: "codigo-de-coleccion",
+    name: "Nombre de Colección",
+    spotify: "https://open.spotify.com/...",
+    youtubeMusic: "https://music.youtube.com/...",
     songs: [
       {
-        title: "Nombre de la Canción 1",
-        artist: "Nombre del Artista / Orquesta",
-        mp3: "nombre-cancion-1.mp3", // Archivo en public/songs/
-        cover: "/covers/portada-1.jpg"  // Archivo de carátula
-      },
-      {
-        title: "Nombre de la Canción 2",
-        artist: "Nombre del Artista",
-        mp3: "nombre-cancion-2.mp3",
-        cover: "/covers/portada-2.jpg"
+        title: "Título",
+        artist: "Artista",
+        cover: portadaImg,
+        mp3: audioMp3,
       }
     ]
   }
 };
 ```
----
 
-## 🔗 2. Cómo construir los links para los llaveros NFC
-
-Cada llavero físico debe llevar grabado en su chip NFC un enlace único que apunte al código registrado en el archivo de canciones.
-
-### Formato Base del Enlace
-```text
-[https://music.mupisacali.com/?code=TU_CODIGO_AQUI](https://music.mupisacali.com/?code=TU_CODIGO_AQUI)
-```
-
-### Ejemplos Prácticos de Enlaces NFC:
-
-| Colección / Llavero | Código Registrado | URL a Grabar en el Chip NFC |
-| :--- | :--- | :--- |
-| **Salsa Caleña Vol. 1** | `salsa-calena-1` | `https://music.mupisacali.com/?code=salsa-calena-1` |
-| **Orquesta Guayacán** | `guayacan-exitos` | `https://music.mupisacali.com/?code=guayacan-exitos` |
-| **Grupo Niche Edición Especial** | `niche-especial` | `https://music.mupisacali.com/?code=niche-especial` |
-
-> ⚠️ **Importante:** Asegúrate de que el valor después de `?code=` coincida exactamente (respetando mayúsculas, minúsculas y guiones) con la clave asignada en `songs.js`.
+### 2. Diccionario de reasignación remota de IDs: `src/data/idMap.json`
+Permite reasignar dinámicamente qué colección reproduce un llavero específico sin alterar el código físico grabado en su chip NFC.
+- **Ubicación:** `src/data/idMap.json`
+- **Estructura:**
+  ```json
+  {
+    "LLAV-001": "codigo-de-coleccion-A",
+    "LLAV-002": "codigo-de-coleccion-B"
+  }
+  ```
 
 ---
 
-## 🛠️ Desarrollo Local
+## 🔗 Estructura de Enlaces NFC (Físicos)
+
+Cada llavero NFC se programa apuntando al dominio del museo utilizando uno de los dos métodos:
+
+1. **Método Directo (Llaveros Tradicionales):**
+   ```text
+   https://music.mupisacali.com/?code=codigo-de-coleccion
+   ```
+2. **Método Dinámico con ID Único (Control Remoto / Analítica):**
+   ```text
+   https://music.mupisacali.com/?code=codigo-base&id=LLAV-001
+   ```
+
+---
+
+## 🛠️ Entorno de Desarrollo Local
 
 1. Instalar dependencias:
    ```bash
    npm install
    ```
-
-2. Iniciar el entorno de desarrollo
+2. Iniciar el servidor de desarrollo:
    ```bash
    npm run dev
    ```
-
-## 📄 Créditos
-- **Proyecto:** MUPISA — Museo Pioneros de la Salsa Caleña.
-- **Desarrollo:** [Muse Ortiz Media](https://museortizmedia.github.io/).

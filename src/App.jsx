@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VinylPlayer from './components/VinylPlayer';
 import { getCollectionByCode } from './data/songs';
+import idMap from './data/idMap.json'; // Diccionario de IDs para control remoto
 import { getStreamableUrl, revokeStreamableUrl } from './services/audioService';
 import { Music, ExternalLink, Share2, Loader2 } from 'lucide-react';
 import MusicMupisa from "./assets/MusicMupisa.png";
@@ -16,7 +17,9 @@ const formatTime = (seconds) => {
 };
 
 function App() {
-  const [authorized, setAuthorized] = useState(() => { return !/iPad|iPhone|iPod/.test(navigator.userAgent) || sessionStorage.getItem('audio_authorized') === 'true'; });
+  const [authorized, setAuthorized] = useState(() => {
+    return !/iPad|iPhone|iPod/.test(navigator.userAgent) || sessionStorage.getItem('audio_authorized') === 'true';
+  });
   const [collection, setCollection] = useState(null);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -37,19 +40,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Función centralizada para procesar y cargar el código del llavero
+    // Función para procesar la lectura del código/ID del llavero
     const handleCodeProcess = () => {
       const params = new URLSearchParams(window.location.search);
       const codeFromUrl = params.get('code');
+      const idFromUrl = params.get('id');
+
+      // 1. Determinar el código final de la canción
+      // Prioridad: 
+      // A) Si viene un ?id=... y existe en idMap.json -> usar el código reasignado
+      // B) Si no existe en idMap.json -> usar el ?code=... por defecto
+      // C) Si no hay nada en la URL -> buscar el código guardado en sessionStorage
+      let resolvedCode = null;
+
+      if (idFromUrl && idMap[idFromUrl]) {
+        resolvedCode = idMap[idFromUrl];
+      } else if (codeFromUrl) {
+        resolvedCode = codeFromUrl;
+      }
+
       const storedCode = sessionStorage.getItem('llavero_code');
-      const activeCode = codeFromUrl || storedCode;
+      const activeCode = resolvedCode || storedCode;
 
       if (activeCode) {
         const foundCollection = getCollectionByCode(activeCode);
         if (foundCollection) {
           sessionStorage.setItem('llavero_code', activeCode);
-          
-          // Gestión del historial en la biblioteca local (localStorage)
+
+          // Guardar en la biblioteca local
           const savedLibrary = JSON.parse(localStorage.getItem('mupisa_library') || '[]');
           if (!savedLibrary.some(item => item.code === activeCode)) {
             const newEntry = {
@@ -61,7 +79,7 @@ function App() {
             localStorage.setItem('mupisa_library', JSON.stringify([newEntry, ...savedLibrary]));
           }
 
-          if (codeFromUrl) {
+          if (codeFromUrl || idFromUrl) {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
           setCollection(foundCollection);
@@ -74,7 +92,7 @@ function App() {
     // Ejecutar al cargar la página
     handleCodeProcess();
 
-    // Escuchar si la URL cambia mientras la app ya está abierta (vital para NFC)
+    // Escuchar si la URL cambia mientras la app está abierta
     window.addEventListener('popstate', handleCodeProcess);
     return () => {
       window.removeEventListener('popstate', handleCodeProcess);
@@ -328,7 +346,9 @@ function App() {
                 <a href={collection.spotify} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-[#1DB954]/10 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm5.503 17.306c-.215.353-.672.463-1.025.249-2.846-1.74-6.429-2.13-10.648-1.168-.404.093-.81-.157-.903-.561-.093-.404.157-.81.561-.903 4.621-1.058 8.583-.611 11.765 1.334.353.214.463.672.249 1.025zm1.468-3.258c-.272.441-.849.581-1.29.31-3.258-2.002-8.225-2.585-12.078-1.415-.497.151-1.022-.132-1.173-.629-.151-.497.132-1.022.629-1.173 4.398-1.335 9.873-.685 13.602 1.61.441.272.581.849.31 1.29zm.126-3.414c-3.906-2.321-10.348-2.534-14.102-1.394-.6.182-1.23-.162-1.412-.762-.182-.6.162-1.23.762-1.412 4.305-1.305 11.415-1.053 15.91 1.616.54.321.716 1.015.395 1.555-.321.54-1.015.716-1.553.397z" /></svg>
+                      <svg className="w-6 h-6 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm5.503 17.306c-.215.353-.672.463-1.025.249-2.846-1.74-6.429-2.13-10.648-1.168-.404.093-.81-.157-.903-.561-.093-.404.157-.81.561-.903 4.621-1.058 8.583-.611 11.765 1.334.353.214.463.672.249 1.025zm1.468-3.258c-.272.441-.849.581-1.29.31-3.258-2.002-8.225-2.585-12.078-1.415-.497.151-1.022-.132-1.173-.629-.151-.497.132-1.022.629-1.173 4.398-1.335 9.873-.685 13.602 1.61.441.272.581.849.31 1.29zm.126-3.414c-3.906-2.321-10.348-2.534-14.102-1.394-.6.182-1.23-.162-1.412-.762-.182-.6.162-1.23.762-1.412 4.305-1.305 11.415-1.053 15.91 1.616.54.321.716 1.015.395 1.555-.321.54-1.015.716-1.553.397z" />
+                      </svg>
                     </div>
                     <span className="font-semibold text-gray-700">Spotify</span>
                   </div>
@@ -339,7 +359,9 @@ function App() {
                 <a href={collection.youtubeMusic} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-[#FF0000]/10 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-[#FF0000]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 18.375c-3.514 0-6.375-2.861-6.375-6.375S8.486 5.625 12 5.625 18.375 8.486 18.375 12 15.514 18.375 12 18.375zM12 7.5c-2.481 0-4.5 2.019-4.5 4.5s2.019 4.5 4.5 4.5 4.5-2.019 4.5-4.5-2.019-4.5-4.5-4.5zm0 6.75c-1.241 0-2.25-1.009-2.25-2.25S10.759 9.75 12 9.75s2.25 1.009 2.25 2.25-1.009 2.25-2.25 2.25z" /></svg>
+                      <svg className="w-6 h-6 text-[#FF0000]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 18.375c-3.514 0-6.375-2.861-6.375-6.375S8.486 5.625 12 5.625 18.375 8.486 18.375 12 15.514 18.375 12 18.375zM12 7.5c-2.481 0-4.5 2.019-4.5 4.5s2.019 4.5 4.5 4.5 4.5-2.019 4.5-4.5-2.019-4.5-4.5-4.5zm0 6.75c-1.241 0-2.25-1.009-2.25-2.25S10.759 9.75 12 9.75s2.25 1.009 2.25 2.25-1.009 2.25-2.25 2.25z" />
+                      </svg>
                     </div>
                     <span className="font-semibold text-gray-700">YouTube Music</span>
                   </div>
