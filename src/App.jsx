@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import VinylPlayer from './components/VinylPlayer';
 import { getCollectionByCode } from './data/songs';
 import { getStreamableUrl, revokeStreamableUrl } from './services/audioService';
-import { Music, ExternalLink, Share2, Loader2 } from 'lucide-react';
+import { Music, ExternalLink, Share2, Loader2, Library } from 'lucide-react';
 import MusicMupisa from "./assets/MusicMupisa.png";
 import AudioPermissionModal from './components/AudioPermissionModal';
+import LibrarySidebar from './components/LibrarySidebar';
 
 const formatTime = (seconds) => {
   if (isNaN(seconds)) return "0:00";
@@ -37,6 +38,18 @@ function App() {
       const foundCollection = getCollectionByCode(activeCode);
       if (foundCollection) {
         sessionStorage.setItem('llavero_code', activeCode);
+        // Library history management
+        const savedLibrary = JSON.parse(localStorage.getItem('mupisa_library') || '[]');
+        if (!savedLibrary.some(item => item.code === activeCode)) {
+          const newEntry = {
+            code: activeCode,
+            title: foundCollection.songs[0]?.title || "Colección MUPISA",
+            artist: foundCollection.songs[0]?.artist || "Varios Artistas",
+            cover: foundCollection.songs[0]?.cover || null
+          };
+          localStorage.setItem('mupisa_library', JSON.stringify([newEntry, ...savedLibrary]));
+        }
+        // Library history management
         if (codeFromUrl) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -173,6 +186,8 @@ function App() {
   return (
     <>
       <AudioPermissionModal onAuthorized={() => setAuthorized(true)} />
+
+      <LibrarySidebar />
 
       {!collection ? (
         <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-6 text-center">
