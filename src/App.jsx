@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import VinylPlayer from './components/VinylPlayer';
 import { getCollectionByCode } from './data/songs';
 import { getStreamableUrl, revokeStreamableUrl } from './services/audioService';
-import { Music, ExternalLink, Share2, Loader2, Library } from 'lucide-react';
+import { Music, ExternalLink, Share2, Loader2 } from 'lucide-react';
 import MusicMupisa from "./assets/MusicMupisa.png";
 import AudioPermissionModal from './components/AudioPermissionModal';
 import LibrarySidebar from './components/LibrarySidebar';
@@ -27,37 +27,58 @@ function App() {
   const audioRef = useRef(new Audio());
 
   const song = collection?.songs[currentSongIndex] || null;
+  const [lang, setLang] = useState("en");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const codeFromUrl = params.get('code');
-    const storedCode = sessionStorage.getItem('llavero_code');
-    const activeCode = codeFromUrl || storedCode;
-
-    if (activeCode) {
-      const foundCollection = getCollectionByCode(activeCode);
-      if (foundCollection) {
-        sessionStorage.setItem('llavero_code', activeCode);
-        // Library history management
-        const savedLibrary = JSON.parse(localStorage.getItem('mupisa_library') || '[]');
-        if (!savedLibrary.some(item => item.code === activeCode)) {
-          const newEntry = {
-            code: activeCode,
-            title: foundCollection.songs[0]?.title || "Colección MUPISA",
-            artist: foundCollection.songs[0]?.artist || "Varios Artistas",
-            cover: foundCollection.songs[0]?.cover || null
-          };
-          localStorage.setItem('mupisa_library', JSON.stringify([newEntry, ...savedLibrary]));
-        }
-        // Library history management
-        if (codeFromUrl) {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        setCollection(foundCollection);
-        setCurrentSongIndex(0);
-        setupAudio(foundCollection.songs[0].mp3);
-      }
+    const browserLang = navigator.language;
+    if (browserLang.startsWith("es")) {
+      setLang("es");
     }
+  }, []);
+
+  useEffect(() => {
+    // Función centralizada para procesar y cargar el código del llavero
+    const handleCodeProcess = () => {
+      const params = new URLSearchParams(window.location.search);
+      const codeFromUrl = params.get('code');
+      const storedCode = sessionStorage.getItem('llavero_code');
+      const activeCode = codeFromUrl || storedCode;
+
+      if (activeCode) {
+        const foundCollection = getCollectionByCode(activeCode);
+        if (foundCollection) {
+          sessionStorage.setItem('llavero_code', activeCode);
+          
+          // Gestión del historial en la biblioteca local (localStorage)
+          const savedLibrary = JSON.parse(localStorage.getItem('mupisa_library') || '[]');
+          if (!savedLibrary.some(item => item.code === activeCode)) {
+            const newEntry = {
+              code: activeCode,
+              title: foundCollection.songs[0]?.title || "Colección MUPISA",
+              artist: foundCollection.songs[0]?.artist || "Varios Artistas",
+              cover: foundCollection.songs[0]?.cover || null
+            };
+            localStorage.setItem('mupisa_library', JSON.stringify([newEntry, ...savedLibrary]));
+          }
+
+          if (codeFromUrl) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setCollection(foundCollection);
+          setCurrentSongIndex(0);
+          setupAudio(foundCollection.songs[0].mp3);
+        }
+      }
+    };
+
+    // Ejecutar al cargar la página
+    handleCodeProcess();
+
+    // Escuchar si la URL cambia mientras la app ya está abierta (vital para NFC)
+    window.addEventListener('popstate', handleCodeProcess);
+    return () => {
+      window.removeEventListener('popstate', handleCodeProcess);
+    };
   }, []);
 
   const setupAudio = async (mp3Path) => {
@@ -86,7 +107,7 @@ function App() {
       };
 
       audioRef.current.onerror = () => {
-        setAudioError(lang === "es" ? "Error al cargar el archivo de audio. Verifica que el archivo exista en public/songs/" : "Error playing audio, please check your internet connection.");
+        setAudioError(lang === "es" ? "Error al cargar el archivo de audio. Verifica que el archivo exista." : "Error playing audio, please check your internet connection.");
         setIsPlaying(false);
         setIsReady(true);
       };
@@ -109,7 +130,7 @@ function App() {
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.error("Error:", error);
-          setAudioError(lang === "es" ? "No se pudo iniciar la reproducción. Asegúrate de haber interactuado con la página primero." : "Error playing audio, please check your internet connection.");
+          setAudioError(lang === "es" ? "No se pudo iniciar la reproducción. Asegúrate de haber interactuado con la página primero." : "Error playing audio.");
           setIsPlaying(false);
         });
       }
@@ -174,19 +195,9 @@ function App() {
     };
   }, [audioUrl]);
 
-  const [lang, setLang] = useState("en");
-
-  useEffect(() => {
-    const browserLang = navigator.language;
-    if (browserLang.startsWith("es")) {
-      setLang("es");
-    }
-  }, []);
-
   return (
     <>
       <AudioPermissionModal onAuthorized={() => setAuthorized(true)} />
-
       <LibrarySidebar />
 
       {!collection ? (
@@ -354,7 +365,6 @@ function App() {
       )}
     </>
   );
-
 }
 
 export default App;
